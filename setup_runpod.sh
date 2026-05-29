@@ -74,7 +74,7 @@ from pathlib import Path
 account_id = os.environ['R2_ACCOUNT_ID']
 access_key = os.environ['R2_ACCESS_KEY']
 secret_key = os.environ['R2_SECRET_KEY']
-bucket     = os.environ['R2_BUCKET']
+bucket     = os.environ.get('R2_BUCKET_NAME') or os.environ['R2_BUCKET']
 prefix     = os.environ.get('R2_PREFIX', 'TrovaMUZ_V1/dataset')
 endpoint   = f'https://{account_id}.r2.cloudflarestorage.com'
 
