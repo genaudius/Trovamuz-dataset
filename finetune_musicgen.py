@@ -431,18 +431,42 @@ def train(args: argparse.Namespace) -> None:
     # Move LoRA params (created on CPU) to the correct device
     model.lm = model.lm.to(device)
 
+    # ── Resume from checkpoint ────────────────────────────────────────────────
+    if args.resume:
+        adapter_path = os.path.join(args.resume, "lora_adapter.pt")
+        if not os.path.exists(adapter_path):
+            raise FileNotFoundError(f"[resume] Adapter not found: {adapter_path}")
+        print(f"[resume] Loading LoRA weights from {adapter_path}")
+        adapter_weights = torch.load(adapter_path, map_location=device)
+        missing, unexpected = model.lm.load_state_dict(adapter_weights, strict=False)
+        if unexpected:
+            print(f"[resume] Unexpected keys (first 3): {unexpected[:3]}")
+        print(f"[resume] Loaded {len(adapter_weights)} tensors — continuing from epoch {args.start_epoch}")
+
     # ── Optimizer (only LoRA params) ──────────────────────────────────────────
     lora_params = [p for p in model.lm.parameters() if p.requires_grad]
     assert lora_params, "No trainable LoRA parameters found!"
 
-    optimizer = AdamW(
-        lora_params,
-        lr=args.lr,
-        betas=(0.9, 0.95),
-        weight_decay=args.weight_decay,
-    )
+    try:
+        from bitsandbytes.optim import AdamW8bit
+        optimizer = AdamW8bit(
+            lora_params,
+            lr=args.lr,
+            betas=(0.9, 0.95),
+            weight_decay=args.weight_decay,
+        )
+        print("[optimizer] AdamW8bit (bitsandbytes)")
+    except ImportError:
+        optimizer = AdamW(
+            lora_params,
+            lr=args.lr,
+            betas=(0.9, 0.95),
+            weight_decay=args.weight_decay,
+        )
+        print("[optimizer] AdamW (bitsandbytes not available)")
 
-    total_steps = args.epochs * math.ceil(len(dataloader) / args.grad_acc)
+    remaining_epochs = args.epochs - args.start_epoch + 1
+    total_steps = remaining_epochs * math.ceil(len(dataloader) / args.grad_acc)
     scheduler = get_scheduler(
         "cosine",
         optimizer,
@@ -481,7 +505,7 @@ def train(args: argparse.Namespace) -> None:
     running_loss = 0.0
     loss_count = 0
 
-    for epoch in range(1, args.epochs + 1):
+    for epoch in range(args.start_epoch, args.epochs + 1):
         epoch_loss = 0.0
         epoch_batches = 0
 
@@ -504,8 +528,15 @@ def train(args: argparse.Namespace) -> None:
 
             codes = torch.cat(all_codes, dim=0)  # [B, K, T]
 
+            # Caption dropout for classifier-free guidance training
+            import random as _random
+            texts_cfgd = [
+                "" if _random.random() < args.caption_dropout else t
+                for t in texts
+            ]
+
             # Prepare conditioning
-            attributes, _ = model._prepare_tokens_and_attributes(texts, None)
+            attributes, _ = model._prepare_tokens_and_attributes(texts_cfgd, None)
             tokenized = model.lm.condition_provider.tokenize(attributes)
             condition_tensors = model.lm.condition_provider(tokenized)
 
@@ -665,8 +696,14 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--batch_size", type=int, default=4)
     p.add_argument("--grad_acc", type=int, default=4,
                    help="Gradient accumulation steps (effective batch = batch_size × grad_acc)")
-    p.add_argument("--weight_decay", type=float, default=1e-5)
+    p.add_argument("--weight_decay", type=float, default=1e-4)
     p.add_argument("--warmup_steps", type=int, default=20)
+    p.add_argument("--caption_dropout", type=float, default=0.05,
+                   help="Probability to drop captions for CFG training")
+    p.add_argument("--resume", default=None,
+                   help="Adapter dir to resume from (contains lora_adapter.pt)")
+    p.add_argument("--start_epoch", type=int, default=1,
+                   help="Starting epoch number (use with --resume)")
     p.add_argument("--save_step", type=int, default=None,
                    help="Save a checkpoint every N optimizer steps (default: off)")
     p.add_argument("--sample_every", type=int, default=None,
