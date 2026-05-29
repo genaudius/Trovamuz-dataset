@@ -19,7 +19,9 @@ echo ""
 # ── System packages ───────────────────────────────────────────────────────────
 echo "[1/6] Installing system packages..."
 apt-get update -qq && apt-get install -y -qq \
-    git ffmpeg libsndfile1 python3-pip python3-venv wget curl screen > /dev/null
+    git ffmpeg libsndfile1 python3-pip python3-venv wget curl screen \
+    pkg-config libavformat-dev libavcodec-dev libavdevice-dev \
+    libavutil-dev libswscale-dev libswresample-dev > /dev/null
 echo "      ✓ System packages ready"
 
 # ── Clone or update the repo ──────────────────────────────────────────────────
