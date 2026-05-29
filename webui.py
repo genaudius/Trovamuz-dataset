@@ -231,7 +231,9 @@ def train_local(dataset_path: str,
         lr: float,
         epochs: int,
         use_wandb: bool,
-        save_step: int = None,):
+        save_step: int = None,
+        batch_size: int = 1,
+        grad_acc: int = 8,):
     if save_step==0:
         save_step=None
     wandb : int
@@ -246,6 +248,8 @@ def train_local(dataset_path: str,
         epochs=int(epochs),
         use_wandb=wandb,
         save_step=save_step,
+        batch_size=int(batch_size),
+        grad_acc=int(grad_acc),
     )
 
 with gr.Blocks(analytics_enabled=False) as demo:
@@ -347,14 +351,16 @@ with gr.Blocks(analytics_enabled=False) as demo:
                                          lambda: {'choices': glob.glob(current_directory+"/training/datasets/*/")},
                                          'refresh-button')
             with gr.Column():
-                lr =  gr.Number(label="Learning rate", value=0.0001, interactive=True)
-                epochs = gr.Number(label="Epoch count", value=5, interactive=True)
+                lr =  gr.Number(label="Learning rate", value=1e-5, interactive=True)
+                epochs = gr.Number(label="Epoch count", value=100, interactive=True)
                 use_wandb = gr.Checkbox(label="Use WanDB", value=False, interactive=True)
-                save_step = gr.Number(label="Number of steps after which to save a checkpoint. 0 is treated as none.", value=0, interactive=True)
+                save_step = gr.Number(label="Checkpoint every N steps (0 = disabled)", value=10, interactive=True)
+                batch_size = gr.Number(label="Batch size (reduce if out of memory)", value=1, interactive=True)
+                grad_acc = gr.Number(label="Gradient accumulation steps (effective batch = batch × grad_acc)", value=8, interactive=True)
         with gr.Row():
-            model_id = gr.Radio(["small", "medium", "large"], label="Model", value="small", interactive=True)
-        train_button = gr.Button(label="Start training")
-        train_button.click(train_local, inputs=[dataset_path,model_id, lr, epochs, use_wandb, save_step], outputs=[output])
+            model_id = gr.Radio(["melody", "small", "medium", "large"], label="Model", value="melody", interactive=True)
+        train_button = gr.Button("Start training")
+        train_button.click(train_local, inputs=[dataset_path, model_id, lr, epochs, use_wandb, save_step, batch_size, grad_acc], outputs=[])
         gr.Markdown(
             """
             # Training
