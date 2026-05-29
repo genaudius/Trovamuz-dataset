@@ -1,0 +1,12 @@
+# TrovaMUZ enrichment tools dependencies
+# Install with: pip install -r requirements_tools.txt
+
+librosa>=0.10.0
+spotipy>=2.23.0
+pylast>=5.2.0
+openai>=1.30.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+numpy>=1.24.0
+demucs>=4.0.0
+transformers>=4.40.0
