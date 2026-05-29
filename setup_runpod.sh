@@ -61,7 +61,21 @@ python -c "import torch; print(f'      ✓ PyTorch {torch.__version__}, CUDA={to
 echo "[5/6] Installing project requirements..."
 pip install -r requirements.txt -q
 pip install -r requirements_tools.txt -q
-pip install transformers wandb demucs -q
+pip install transformers wandb demucs boto3 bitsandbytes -q
+
+# ── Audiocraft v1.3.0 (must use tag — main branch has JASCO/spacy conflict) ──
+if [ ! -d "repositories/audiocraft/.git" ]; then
+    echo "      Cloning audiocraft v1.3.0..."
+    mkdir -p repositories
+    git clone https://github.com/facebookresearch/audiocraft.git repositories/audiocraft -q
+    cd repositories/audiocraft && git checkout v1.3.0 -q && cd ../..
+fi
+pip install -e repositories/audiocraft -q
+
+# ── Reinstall torch after audiocraft (audiocraft may downgrade it) ────────────
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu121 --upgrade -q
+pip install "numpy<2.0" --force-reinstall -q
+
 echo "      ✓ All packages installed"
 
 # ── Dataset desde Cloudflare R2 ───────────────────────────────────────────────
