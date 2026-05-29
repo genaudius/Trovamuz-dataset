@@ -512,11 +512,16 @@ def train(args: argparse.Namespace) -> None:
             _s3 = _boto3.client('s3',
                 endpoint_url=f'https://{_aid}.r2.cloudflarestorage.com',
                 aws_access_key_id=_ak, aws_secret_access_key=_sk, region_name='auto')
-            best_dir = Path(output_dir) / 'best'
-            for _f in best_dir.glob('*'):
-                _key = f'TrovaMUZ_V1/adapters/{output_dir}/best/{_f.name}'
-                _s3.upload_file(str(_f), _bkt, _key)
-            print(f"[r2] ✓ best adapter uploaded to R2 ({output_dir}/best/)")
+            _uploaded = 0
+            for _subdir in ['best', 'samples']:
+                _dir = Path(output_dir) / _subdir
+                if not _dir.exists():
+                    continue
+                for _f in _dir.glob('*'):
+                    _key = f'TrovaMUZ_V1/adapters/{output_dir}/{_subdir}/{_f.name}'
+                    _s3.upload_file(str(_f), _bkt, _key)
+                    _uploaded += 1
+            print(f"[r2] ✓ {_uploaded} archivos subidos (best/ + samples/)")
         except Exception as _e:
             print(f"[r2] Upload skipped (non-fatal): {_e}")
 
