@@ -7,7 +7,7 @@
 
 set -e
 
-REPO_URL="${TROVAMUZ_REPO:-}"   # set via RunPod env var or edit below
+REPO_URL="${TROVAMUZ_REPO:-https://github.com/genaudius/Trovamuz-dataset.git}"
 GITHUB_TOKEN="${GITHUB_TOKEN:-}"
 
 echo ""
