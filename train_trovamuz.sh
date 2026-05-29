@@ -48,7 +48,7 @@ else
 fi
 
 # ── Instalar bitsandbytes si no está ─────────────────────────────────────────
-python3 -c "import bitsandbytes" 2>/dev/null || pip install bitsandbytes -q
+python3 -c "import bitsandbytes" 2>/dev/null || pip install bitsandbytes -q || echo "[warn] bitsandbytes no disponible — usando AdamW estándar"
 
 # ── Training V3: resume desde epoch 176 ──────────────────────────────────────
 python finetune_musicgen.py \
