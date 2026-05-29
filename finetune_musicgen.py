@@ -498,6 +498,28 @@ def train(args: argparse.Namespace) -> None:
         "trigger_word": "musicgau_adn style, TrovaMUZ_V1",
     }
 
+    # ── R2 upload helper (crash protection) ──────────────────────────────────
+    def _upload_best_to_r2(output_dir: str) -> None:
+        try:
+            import boto3 as _boto3
+            _aid = os.environ.get('R2_ACCOUNT_ID')
+            _ak  = os.environ.get('R2_ACCESS_KEY')
+            _sk  = os.environ.get('R2_SECRET_KEY')
+            _bkt = os.environ.get('R2_BUCKET_NAME') or os.environ.get('R2_BUCKET')
+            if not all([_aid, _ak, _sk, _bkt]):
+                print("[r2] R2 env vars missing — skipping mid-training upload")
+                return
+            _s3 = _boto3.client('s3',
+                endpoint_url=f'https://{_aid}.r2.cloudflarestorage.com',
+                aws_access_key_id=_ak, aws_secret_access_key=_sk, region_name='auto')
+            best_dir = Path(output_dir) / 'best'
+            for _f in best_dir.glob('*'):
+                _key = f'TrovaMUZ_V1/adapters/{output_dir}/best/{_f.name}'
+                _s3.upload_file(str(_f), _bkt, _key)
+            print(f"[r2] ✓ best adapter uploaded to R2 ({output_dir}/best/)")
+        except Exception as _e:
+            print(f"[r2] Upload skipped (non-fatal): {_e}")
+
     # ── Training loop ─────────────────────────────────────────────────────────
     global_step = 0
     optimizer_step = 0
@@ -618,6 +640,10 @@ def train(args: argparse.Namespace) -> None:
         epoch_dir = os.path.join(args.output, f"epoch-{epoch}")
         save_lora_adapter(model.lm, epoch_dir, lora_config)
 
+        # Upload best adapter to R2 every N epochs (crash protection)
+        if args.upload_every and epoch % args.upload_every == 0:
+            _upload_best_to_r2(args.output)
+
         # Generate audio sample every N epochs
         if args.sample_every and epoch % args.sample_every == 0 and args.test_prompt:
             samples_dir = os.path.join(args.output, "samples")
@@ -708,6 +734,8 @@ def parse_args() -> argparse.Namespace:
                    help="Save a checkpoint every N optimizer steps (default: off)")
     p.add_argument("--sample_every", type=int, default=None,
                    help="Generate a test audio sample every N epochs and save to output/samples/")
+    p.add_argument("--upload_every", type=int, default=None,
+                   help="Upload best adapter to R2 every N epochs (crash protection)")
     # Demucs
     p.add_argument("--demucs", action="store_true",
                    help="Run Demucs vocal separation before encoding "

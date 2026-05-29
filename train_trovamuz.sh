@@ -67,6 +67,7 @@ python finetune_musicgen.py \
     --caption_dropout 0.05 \
     --warmup_steps 10 \
     --sample_every 250 \
+    --upload_every 50 \
     --output models/TrovaMUZ_V1_LoRA_v3 \
     --test_prompt "musicgau_adn style, TrovaMUZ_V1 Dominican bachata romantica, syncopated bicheo rhythm, requinto guitar with expressive bends, 116 BPM, A minor, romantic melancholic mood"
 
