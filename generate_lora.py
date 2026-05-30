@@ -150,22 +150,45 @@ def main():
     model.lm = model.lm.to(device)
     model.lm.eval()
 
-    model.set_generation_params(
-        duration=args.duration,
-        use_sampling=True,
-        top_k=args.top_k,
-        cfg_coef=args.cfg_coef,
-    )
+    CHUNK = 30
+    overlap = 5
 
     print(f"\nPrompt: {prompt[:100]}...")
-    print("Generando...")
-    with torch.no_grad():
-        wav = model.generate([prompt], progress=True)
 
-    wav_np = wav[0, 0].cpu().numpy()
-    wav_np = np.clip(wav_np, -1.0, 1.0).astype(np.float32)
-    sf.write(args.output, wav_np, model.sample_rate)
-    print(f"\n✓ Guardado → {args.output}  ({len(wav_np)/model.sample_rate:.1f}s)")
+    chunks = []
+    remaining = args.duration
+    chunk_num = 1
+    total_chunks = math.ceil(args.duration / (CHUNK - overlap))
+
+    with torch.no_grad():
+        while remaining > 0:
+            this_duration = min(CHUNK, remaining)
+            print(f"\nGenerando chunk {chunk_num}/{total_chunks} ({this_duration}s)...")
+            model.set_generation_params(
+                duration=this_duration,
+                use_sampling=True,
+                top_k=args.top_k,
+                cfg_coef=args.cfg_coef,
+            )
+
+            if chunks:
+                prev_wav = torch.from_numpy(chunks[-1]).unsqueeze(0).unsqueeze(0).to(device)
+                overlap_samples = int(overlap * model.sample_rate)
+                melody = prev_wav[:, :, -overlap_samples:]
+                wav = model.generate_with_chroma([prompt], melody, model.sample_rate, progress=True)
+                wav_np = wav[0, 0].cpu().numpy()[int(overlap * model.sample_rate):]
+                remaining -= (this_duration - overlap)
+            else:
+                wav = model.generate([prompt], progress=True)
+                wav_np = wav[0, 0].cpu().numpy()
+                remaining -= this_duration
+
+            chunks.append(wav_np)
+            chunk_num += 1
+
+    final = np.clip(np.concatenate(chunks), -1.0, 1.0).astype(np.float32)
+    sf.write(args.output, final, model.sample_rate)
+    print(f"\n✓ Guardado → {args.output}  ({len(final)/model.sample_rate:.1f}s)")
 
 
 if __name__ == "__main__":
