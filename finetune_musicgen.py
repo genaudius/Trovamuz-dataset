@@ -641,9 +641,15 @@ def train(args: argparse.Namespace) -> None:
         avg_epoch = epoch_loss / max(epoch_batches, 1)
         print(f"\n[epoch {epoch}] avg loss: {avg_epoch:.4f}  (best: {best_loss:.4f})\n")
 
-        # Save after each epoch
+        # Save after each epoch — keep only the last 2 to avoid filling disk
         epoch_dir = os.path.join(args.output, f"epoch-{epoch}")
         save_lora_adapter(model.lm, epoch_dir, lora_config)
+        _keep = 2
+        _all_epoch_dirs = sorted(Path(args.output).glob("epoch-*"),
+                                 key=lambda p: int(p.name.split("-")[1]))
+        for _old in _all_epoch_dirs[:-_keep]:
+            import shutil as _shutil
+            _shutil.rmtree(str(_old), ignore_errors=True)
 
         # Upload best adapter to R2 every N epochs (crash protection)
         if args.upload_every and epoch % args.upload_every == 0:
