@@ -156,35 +156,20 @@ def main():
     print(f"\nPrompt: {prompt[:100]}...")
 
     chunks = []
-    remaining = args.duration
-    chunk_num = 1
-    total_chunks = math.ceil(args.duration / (CHUNK - overlap))
+    n_chunks = math.ceil(args.duration / CHUNK)
 
     with torch.no_grad():
-        while remaining > 0:
-            this_duration = min(CHUNK, remaining)
-            print(f"\nGenerando chunk {chunk_num}/{total_chunks} ({this_duration}s)...")
+        for chunk_num in range(n_chunks):
+            this_duration = min(CHUNK, args.duration - chunk_num * CHUNK)
+            print(f"\nGenerando chunk {chunk_num+1}/{n_chunks} ({this_duration}s)...")
             model.set_generation_params(
                 duration=this_duration,
                 use_sampling=True,
                 top_k=args.top_k,
                 cfg_coef=args.cfg_coef,
             )
-
-            if chunks:
-                prev_wav = torch.from_numpy(chunks[-1]).unsqueeze(0).unsqueeze(0).to(device)
-                overlap_samples = int(overlap * model.sample_rate)
-                melody = prev_wav[:, :, -overlap_samples:]
-                wav = model.generate_with_chroma([prompt], melody, model.sample_rate, progress=True)
-                wav_np = wav[0, 0].cpu().numpy()[int(overlap * model.sample_rate):]
-                remaining -= (this_duration - overlap)
-            else:
-                wav = model.generate([prompt], progress=True)
-                wav_np = wav[0, 0].cpu().numpy()
-                remaining -= this_duration
-
-            chunks.append(wav_np)
-            chunk_num += 1
+            wav = model.generate([prompt], progress=True)
+            chunks.append(wav[0, 0].cpu().numpy())
 
     final = np.clip(np.concatenate(chunks), -1.0, 1.0).astype(np.float32)
     sf.write(args.output, final, model.sample_rate)
